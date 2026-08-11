@@ -39,8 +39,8 @@ app.add_middleware(
 )
 
 # Paths configuration
-DATA_DIR = os.path.join(backend_root, "data")
-DB_PATH = os.path.join(backend_root, "chroma_db")
+DATA_DIR = os.getenv("DATA_DIR", os.path.join(backend_root, "data"))
+DB_PATH = os.getenv("DB_PATH", os.path.join(backend_root, "chroma_db"))
 
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(DB_PATH, exist_ok=True)
