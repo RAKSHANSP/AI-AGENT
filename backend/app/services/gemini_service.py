@@ -190,6 +190,66 @@ class GeminiRAGPipeline:
             logger.error(f"Error calling Gemini API: {str(e)}")
             return f"An error occurred while generating response: {str(e)}"
 
+    def run_query_stream(self, question: str):
+        """
+        Runs a user query through the RAG pipeline and yields stream events.
+        
+        Yields:
+            dict: Event with type 'sources', 'content', or 'error'
+        """
+        if not api_key:
+            yield {"type": "error", "content": "Error: Gemini API key is missing or not configured. Please check your .env file."}
+            return
+            
+        try:
+            logger.info(f"Running streaming query: {question}")
+            
+            # 1. Retrieve documents using LangChain retriever
+            docs = self.retriever.invoke(question)
+            
+            # 2. Extract unique sources
+            unique_sources = set()
+            for doc in docs:
+                source_name = doc.metadata.get("source")
+                if source_name:
+                    unique_sources.add(source_name)
+            sources = sorted(list(unique_sources))
+            
+            # Yield sources first so frontend can display them immediately
+            yield {"type": "sources", "sources": sources}
+            
+            # 3. Format context
+            context = self._format_context(docs)
+            
+            # If context is empty, yield fallback message and exit
+            if not context or context.strip() == "":
+                yield {"type": "content", "content": self.fallback_message}
+                return
+                
+            prompt = PROMPT_TEMPLATE.format(context=context, question=question)
+            
+            # 4. Call Gemini generate_content with stream=True
+            response = self.model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.1,
+                ),
+                stream=True
+            )
+            
+            # Yield chunks of text in real-time
+            for chunk in response:
+                try:
+                    text = chunk.text
+                    if text:
+                        yield {"type": "content", "content": text}
+                except Exception as ex:
+                    logger.warning(f"Failed to extract text from chunk: {ex}")
+                    
+        except Exception as e:
+            logger.error(f"RAG streaming execution failed: {str(e)}")
+            yield {"type": "error", "content": f"Failed to get a response from the model: {str(e)}"}
+
     def run_query(self, question: str) -> Tuple[str, List[str]]:
         """
         Runs a user query through the RAG pipeline.

@@ -35,6 +35,59 @@ export const apiService = {
     }
   },
 
+  // Public Chat Endpoint (Streaming)
+  chatStream: async (question, onChunk, onError, onDone) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Server error');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        
+        // Save the last partial line back to buffer
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          if (trimmed.startsWith('data: ')) {
+            const dataStr = trimmed.slice(6);
+            if (dataStr === '[DONE]') {
+              continue;
+            }
+            try {
+              const data = JSON.parse(dataStr);
+              onChunk(data);
+            } catch (err) {
+              console.error('Error parsing SSE JSON:', err, trimmed);
+            }
+          }
+        }
+      }
+      onDone();
+    } catch (error) {
+      onError(error);
+    }
+  },
+
   // Admin Authentication
   login: async (password) => {
     try {

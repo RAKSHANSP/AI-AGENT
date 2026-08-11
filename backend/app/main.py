@@ -2,7 +2,9 @@ import os
 import shutil
 import logging
 from typing import List, Dict, Any
+import json
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Header
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -88,7 +90,7 @@ async def startup_event():
 def read_root():
     return {"status": "online", "message": "StartupTN AI Assistant backend is running."}
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat")
 def chat_endpoint(request: ChatRequest):
     if not rag_pipeline:
         raise HTTPException(status_code=503, detail="RAG Pipeline not initialized")
@@ -97,12 +99,16 @@ def chat_endpoint(request: ChatRequest):
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
         
-    try:
-        answer, sources = rag_pipeline.run_query(question)
-        return ChatResponse(answer=answer, sources=sources)
-    except Exception as e:
-        logger.error(f"Error handling query: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal Query Error: {str(e)}")
+    def sse_generator():
+        try:
+            for event in rag_pipeline.run_query_stream(question):
+                yield f"data: {json.dumps(event)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"Error in streaming query: {str(e)}")
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")
 
 @app.post("/api/admin/login")
 def admin_login(request: LoginRequest):

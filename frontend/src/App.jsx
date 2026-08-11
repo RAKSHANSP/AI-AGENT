@@ -95,25 +95,55 @@ function App() {
     setMessages(prev => [...prev, userMessage]);
     setLoading(true);
 
+    const assistantMessageId = Date.now() + 1;
+    const initialAssistantMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      sources: []
+    };
+
+    setMessages(prev => [...prev, initialAssistantMessage]);
+
     try {
-      const response = await apiService.chat(text);
-      const assistantMessage = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: response.answer,
-        sources: response.sources || []
-      };
-      setMessages(prev => [...prev, assistantMessage]);
+      await apiService.chatStream(
+        text,
+        (chunk) => {
+          if (chunk.type === 'sources') {
+            setMessages(prev =>
+              prev.map(m => m.id === assistantMessageId ? { ...m, sources: chunk.sources } : m)
+            );
+          } else if (chunk.type === 'content') {
+            setLoading(false);
+            setMessages(prev =>
+              prev.map(m => m.id === assistantMessageId ? { ...m, content: m.content + chunk.content } : m)
+            );
+          } else if (chunk.type === 'error') {
+            setError(chunk.content);
+            setMessages(prev =>
+              prev.map(m => m.id === assistantMessageId ? { ...m, content: "Error: " + chunk.content, isError: true } : m)
+            );
+          }
+        },
+        (err) => {
+          console.error(err);
+          setError(err.message || "Unable to connect to the AI Assistant. Please try again.");
+          setMessages(prev =>
+            prev.map(m => m.id === assistantMessageId ? {
+              ...m,
+              content: "Error: I failed to retrieve information. Please verify the backend is running and try again.",
+              isError: true
+            } : m)
+          );
+          setLoading(false);
+        },
+        () => {
+          setLoading(false);
+        }
+      );
     } catch (err) {
       console.error(err);
-      setError(err.detail || "Unable to connect to the AI Assistant. Please try again.");
-      setMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: "Error: I failed to retrieve information. Please verify the backend is running and try again.",
-        isError: true
-      }]);
-    } finally {
+      setError(err.message || "Unable to connect to the AI Assistant. Please try again.");
       setLoading(false);
     }
   };
