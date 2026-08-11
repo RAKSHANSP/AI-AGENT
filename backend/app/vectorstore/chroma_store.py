@@ -22,8 +22,8 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
 
-from utils.pdf_loader import load_pdfs_from_directory
-from utils.text_splitter import split_documents
+from app.utils.pdf_loader import load_pdfs_from_directory
+from app.utils.text_splitter import split_documents
 
 logger = logging.getLogger(__name__)
 
