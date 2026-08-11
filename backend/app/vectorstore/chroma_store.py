@@ -17,7 +17,6 @@ except Exception:
     pass
 
 import chromadb
-from sentence_transformers import SentenceTransformer
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
@@ -27,21 +26,35 @@ from app.utils.text_splitter import split_documents
 
 logger = logging.getLogger(__name__)
 
-class SentenceTransformerEmbeddingWrapper:
+class GeminiEmbeddingWrapper:
     """
-    A wrapper class for SentenceTransformer to generate embeddings for ChromaDB and LangChain.
+    A wrapper class for Gemini API to generate embeddings, eliminating local model overhead.
     """
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        logger.info(f"Loading SentenceTransformer model: {model_name}")
-        self.model = SentenceTransformer(model_name)
+    def __init__(self):
+        logger.info("Initializing Gemini Embeddings API Wrapper")
         
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        embeddings = self.model.encode(texts, show_progress_bar=False)
-        return embeddings.tolist()
+        import google.generativeai as genai
+        embeddings = []
+        batch_size = 16
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            response = genai.embed_content(
+                model="models/gemini-embedding-001",
+                content=batch_texts,
+                task_type="retrieval_document"
+            )
+            embeddings.extend(response['embedding'])
+        return embeddings
         
     def embed_query(self, text: str) -> List[float]:
-        embedding = self.model.encode(text, show_progress_bar=False)
-        return embedding.tolist()
+        import google.generativeai as genai
+        response = genai.embed_content(
+            model="models/gemini-embedding-001",
+            content=text,
+            task_type="retrieval_query"
+        )
+        return response['embedding']
 
 
 class ChromaLangChainRetriever(BaseRetriever):
@@ -49,7 +62,7 @@ class ChromaLangChainRetriever(BaseRetriever):
     Custom LangChain Retriever to fetch top 5 context chunks from the local ChromaDB collection.
     """
     collection: Any = Field(description="ChromaDB Collection instance")
-    embedder: Any = Field(description="SentenceTransformerEmbeddingWrapper instance")
+    embedder: Any = Field(description="GeminiEmbeddingWrapper instance")
     
     def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
         try:
@@ -79,7 +92,7 @@ class StartupTNVectorStore:
     Manages the persistent ChromaDB database, handling PDF loading, splitting, 
     indexing, and retrieval of documents.
     """
-    def __init__(self, db_path: str = "./chroma_db", collection_name: str = "startuptn_docs"):
+    def __init__(self, db_path: str = "./chroma_db", collection_name: str = "startuptn_docs_gemini"):
         self.db_path = os.path.abspath(db_path)
         self.collection_name = collection_name
         
@@ -91,7 +104,7 @@ class StartupTNVectorStore:
         self.client = _CLIENTS[self.db_path]
         
         # Initialize Embeddings model wrapper
-        self.embedder = SentenceTransformerEmbeddingWrapper()
+        self.embedder = GeminiEmbeddingWrapper()
         
         # Get or create persistent collection
         self.collection = self.client.get_or_create_collection(
