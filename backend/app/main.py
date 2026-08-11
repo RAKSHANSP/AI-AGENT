@@ -25,15 +25,10 @@ load_dotenv(dotenv_path=env_path)
 app = FastAPI(title="StartupTN AI Assistant API", version="1.0.0")
 
 # Setup CORS middleware
-# Allow localhost:5173 (standard Vite development server origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
