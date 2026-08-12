@@ -104,16 +104,16 @@ async def startup_event():
 
         async def background_sync():
             try:
-                if vector_store.get_document_count() == 0:
-                    stats = vector_store.sync_database(data_dir=DATA_DIR)
-                    _debug_log("main.py:startup:sync_done", "Background sync complete", stats, "C")
-                else:
-                    _debug_log("main.py:startup:sync_skipped", "Skipped sync; index already populated", {
-                        "chunk_count": vector_store.get_document_count(),
-                    }, "C")
+                stats = vector_store.sync_database(data_dir=DATA_DIR)
+                _debug_log("main.py:startup:sync_done", "Background sync complete", {
+                    "indexed": stats.get("indexed", []),
+                    "total_chunks_added": stats.get("total_chunks_added", 0),
+                    "errors": [{"file": e["file"], "error": e["error"][:120]} for e in stats.get("errors", [])],
+                    "pdfs_on_disk": stats.get("pdfs_on_disk", 0),
+                }, "A")
             except Exception as sync_err:
                 logger.error(f"Background sync failed: {str(sync_err)}")
-                _debug_log("main.py:startup:sync_error", "Background sync failed", {"error": str(sync_err)}, "C")
+                _debug_log("main.py:startup:sync_error", "Background sync failed", {"error": str(sync_err)}, "A")
 
         asyncio.create_task(background_sync())
         logger.info("Startup initialization complete.")
@@ -173,10 +173,15 @@ def get_admin_status():
     try:
         doc_count = vector_store.get_document_count()
         indexed_files = vector_store.get_indexed_files()
+        disk_pdfs = []
+        if os.path.exists(DATA_DIR):
+            disk_pdfs = [f for f in os.listdir(DATA_DIR) if f.lower().endswith(".pdf")]
         return {
             "files_count": len(indexed_files),
             "chunks_count": doc_count,
-            "indexed_files": indexed_files
+            "indexed_files": indexed_files,
+            "pdfs_on_disk": len(disk_pdfs),
+            "disk_files": sorted(disk_pdfs),
         }
     except Exception as e:
         logger.error(f"Error fetching database stats: {str(e)}")

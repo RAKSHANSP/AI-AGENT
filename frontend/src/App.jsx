@@ -162,7 +162,22 @@ function App() {
     try {
       const response = await apiService.syncDatabase();
       await fetchStatus();
-      alert(`Database synced successfully! Added ${response.sync_stats?.total_chunks_added || 0} chunks.`);
+      const stats = response.sync_stats || {};
+      const errors = stats.errors || [];
+      if (errors.length > 0) {
+        setAdminError(`Sync errors: ${errors.map(e => `${e.file}: ${e.error}`).join('; ')}`);
+      }
+      if (stats.total_chunks_added > 0) {
+        alert(`Database synced successfully! Indexed ${stats.indexed?.length || 0} file(s), added ${stats.total_chunks_added} chunks.`);
+      } else if (errors.length > 0) {
+        alert(`Sync failed to index documents. Check the error message in the admin panel.`);
+      } else if ((stats.skipped?.length || 0) > 0) {
+        alert(`All ${stats.skipped.length} PDF(s) are already indexed (${stats.pdfs_indexed_before || stats.skipped.length} files, ${statusData.chunks_count} chunks).`);
+      } else if ((stats.pdfs_on_disk || 0) === 0) {
+        alert('No PDF files found in the data folder. Upload PDFs first, then sync.');
+      } else {
+        alert('Sync finished but no chunks were added. Check admin panel for details.');
+      }
     } catch (err) {
       setAdminError(err.detail || "Sync failed.");
     } finally {
@@ -207,9 +222,19 @@ function App() {
 
     try {
       await apiService.uploadDocument(file);
-      setUploadSuccess(`Uploaded "${file.name}" successfully! Trigger sync to index it.`);
-      // Reload status to reflect file additions
-      fetchStatus();
+      setUploadSuccess(`Uploaded "${file.name}" successfully! Indexing now...`);
+      const syncResponse = await apiService.syncDatabase();
+      await fetchStatus();
+      const stats = syncResponse.sync_stats || {};
+      const errors = stats.errors || [];
+      if (errors.length > 0) {
+        setAdminError(`Indexing failed: ${errors.map(e => `${e.file}: ${e.error}`).join('; ')}`);
+        setUploadSuccess(null);
+      } else if (stats.total_chunks_added > 0) {
+        setUploadSuccess(`Uploaded and indexed "${file.name}" (${stats.total_chunks_added} chunks).`);
+      } else {
+        setUploadSuccess(`Uploaded "${file.name}". File is already indexed.`);
+      }
     } catch (err) {
       setAdminError(err.detail || "File upload failed.");
     } finally {

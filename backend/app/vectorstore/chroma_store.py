@@ -1,7 +1,27 @@
 import os
 import uuid
+import json
+import time
 import logging
 from typing import List, Any, Dict
+
+DEBUG_LOG_PATH = "/home/rakshan/Desktop/StartupTN-Chatbot/.cursor/debug-0faf1f.log"
+
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str):
+    # #region agent log
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "0faf1f",
+                "location": location,
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+                "hypothesisId": hypothesis_id,
+            }) + "\n")
+    except Exception:
+        pass
+    # #endregion
 
 # Monkey-patch chromadb's rust bindings stop method to prevent AttributeError during hot-reloading
 try:
@@ -26,35 +46,24 @@ from app.utils.text_splitter import split_documents
 
 logger = logging.getLogger(__name__)
 
-class GeminiEmbeddingWrapper:
+class LocalEmbeddingWrapper:
     """
-    A wrapper class for Gemini API to generate embeddings, eliminating local model overhead.
+    Local embeddings via FastEmbed — no Gemini API quota needed for indexing.
     """
+    _model = None
+
     def __init__(self):
-        logger.info("Initializing Gemini Embeddings API Wrapper")
-        
+        if LocalEmbeddingWrapper._model is None:
+            from fastembed import TextEmbedding
+            logger.info("Loading local FastEmbed model (BAAI/bge-small-en-v1.5)")
+            LocalEmbeddingWrapper._model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        self.model = LocalEmbeddingWrapper._model
+
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        import google.generativeai as genai
-        embeddings = []
-        batch_size = 16
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i + batch_size]
-            response = genai.embed_content(
-                model="models/gemini-embedding-001",
-                content=batch_texts,
-                task_type="retrieval_document"
-            )
-            embeddings.extend(response['embedding'])
-        return embeddings
-        
+        return [[float(x) for x in vec] for vec in self.model.embed(texts)]
+
     def embed_query(self, text: str) -> List[float]:
-        import google.generativeai as genai
-        response = genai.embed_content(
-            model="models/gemini-embedding-001",
-            content=text,
-            task_type="retrieval_query"
-        )
-        return response['embedding']
+        return [float(x) for x in next(self.model.embed([text]))]
 
 
 class ChromaLangChainRetriever(BaseRetriever):
@@ -62,7 +71,7 @@ class ChromaLangChainRetriever(BaseRetriever):
     Custom LangChain Retriever to fetch top 5 context chunks from the local ChromaDB collection.
     """
     collection: Any = Field(description="ChromaDB Collection instance")
-    embedder: Any = Field(description="GeminiEmbeddingWrapper instance")
+    embedder: Any = Field(description="LocalEmbeddingWrapper instance")
     
     def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
         try:
@@ -92,7 +101,7 @@ class StartupTNVectorStore:
     Manages the persistent ChromaDB database, handling PDF loading, splitting, 
     indexing, and retrieval of documents.
     """
-    def __init__(self, db_path: str = "./chroma_db", collection_name: str = "startuptn_docs_gemini"):
+    def __init__(self, db_path: str = "./chroma_db", collection_name: str = "startuptn_docs_bge"):
         self.db_path = os.path.abspath(db_path)
         self.collection_name = collection_name
         
@@ -103,8 +112,8 @@ class StartupTNVectorStore:
             _CLIENTS[self.db_path] = chromadb.PersistentClient(path=self.db_path)
         self.client = _CLIENTS[self.db_path]
         
-        # Initialize Embeddings model wrapper
-        self.embedder = GeminiEmbeddingWrapper()
+        # Initialize local embeddings (no API quota)
+        self.embedder = LocalEmbeddingWrapper()
         
         # Get or create persistent collection
         self.collection = self.client.get_or_create_collection(
@@ -160,8 +169,18 @@ class StartupTNVectorStore:
             "indexed": [],
             "deleted": [],
             "skipped": [f for f in current_pdfs if f in indexed_pdfs],
-            "total_chunks_added": 0
+            "errors": [],
+            "total_chunks_added": 0,
+            "pdfs_on_disk": len(current_pdfs),
+            "pdfs_indexed_before": len(indexed_pdfs),
         }
+
+        _debug_log("chroma_store.py:sync:start", "Sync started", {
+            "data_dir": data_dir,
+            "current_pdfs": current_pdfs,
+            "indexed_pdfs": indexed_pdfs,
+            "to_index": to_index,
+        }, "A")
         
         # Handle deletions
         for filename in to_delete:
@@ -209,10 +228,20 @@ class StartupTNVectorStore:
                     stats["total_chunks_added"] += len(chunks)
                     logger.info(f"Successfully indexed {filename} ({len(chunks)} chunks).")
                 except Exception as e:
-                    logger.error(f"Failed to index {filename}: {str(e)}")
+                    err_msg = str(e)
+                    logger.error(f"Failed to index {filename}: {err_msg}")
+                    stats["errors"].append({"file": filename, "error": err_msg})
         else:
             logger.info("No new documents to index. ChromaDB is up to date.")
-            
+
+        _debug_log("chroma_store.py:sync:done", "Sync finished", {
+            "indexed": stats["indexed"],
+            "deleted": stats["deleted"],
+            "skipped": stats["skipped"],
+            "errors": [{"file": e["file"], "error": e["error"][:200]} for e in stats["errors"]],
+            "total_chunks_added": stats["total_chunks_added"],
+            "pdfs_on_disk": stats["pdfs_on_disk"],
+        }, "A")
         return stats
 
     def get_retriever(self) -> BaseRetriever:
