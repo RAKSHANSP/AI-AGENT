@@ -127,11 +127,12 @@ function App() {
         },
         (err) => {
           console.error(err);
-          setError(err.message || "Unable to connect to the AI Assistant. Please try again.");
+          const errMsg = err.message || "Unable to connect to the AI Assistant. Please try again.";
+          setError(errMsg);
           setMessages(prev =>
             prev.map(m => m.id === assistantMessageId ? {
               ...m,
-              content: "Error: I failed to retrieve information. Please verify the backend is running and try again.",
+              content: `Error: ${errMsg}`,
               isError: true
             } : m)
           );

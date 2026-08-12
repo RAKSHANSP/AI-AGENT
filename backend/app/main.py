@@ -1,6 +1,8 @@
 import os
 import shutil
 import logging
+import asyncio
+import time
 from typing import List, Dict, Any
 import json
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Header
@@ -50,6 +52,24 @@ rag_pipeline = None
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 MOCK_TOKEN = "startuptn-secure-admin-token"
 
+DEBUG_LOG_PATH = "/home/rakshan/Desktop/StartupTN-Chatbot/.cursor/debug-0faf1f.log"
+
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str):
+    # #region agent log
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "0faf1f",
+                "location": location,
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+                "hypothesisId": hypothesis_id,
+            }) + "\n")
+    except Exception:
+        pass
+    # #endregion
+
 # Schema models
 class ChatRequest(BaseModel):
     question: str
@@ -74,17 +94,32 @@ def verify_admin_token(authorization: str = Header(None)):
 async def startup_event():
     global vector_store, rag_pipeline
     logger.info("Initializing vector store and RAG pipeline...")
+    _debug_log("main.py:startup:begin", "Startup began", {"data_dir": DATA_DIR}, "C")
     try:
-        # Initialize Vector Store
         vector_store = StartupTNVectorStore(db_path=DB_PATH)
-        # Perform initial sync with local data directory
-        vector_store.sync_database(data_dir=DATA_DIR)
-        
-        # Initialize LangChain RAG pipeline
         rag_pipeline = GeminiRAGPipeline(vector_store.get_retriever())
+        _debug_log("main.py:startup:ready", "RAG pipeline ready before sync", {
+            "chunk_count": vector_store.get_document_count(),
+        }, "C")
+
+        async def background_sync():
+            try:
+                if vector_store.get_document_count() == 0:
+                    stats = vector_store.sync_database(data_dir=DATA_DIR)
+                    _debug_log("main.py:startup:sync_done", "Background sync complete", stats, "C")
+                else:
+                    _debug_log("main.py:startup:sync_skipped", "Skipped sync; index already populated", {
+                        "chunk_count": vector_store.get_document_count(),
+                    }, "C")
+            except Exception as sync_err:
+                logger.error(f"Background sync failed: {str(sync_err)}")
+                _debug_log("main.py:startup:sync_error", "Background sync failed", {"error": str(sync_err)}, "C")
+
+        asyncio.create_task(background_sync())
         logger.info("Startup initialization complete.")
     except Exception as e:
         logger.error(f"Startup initialization failed: {str(e)}")
+        _debug_log("main.py:startup:error", "Startup failed", {"error": str(e)}, "C")
 
 @app.get("/")
 def read_root():
@@ -92,7 +127,12 @@ def read_root():
 
 @app.post("/api/chat")
 def chat_endpoint(request: ChatRequest):
+    _debug_log("main.py:chat:request", "Chat request received", {
+        "rag_ready": rag_pipeline is not None,
+        "question_len": len(request.question or ""),
+    }, "B,C")
     if not rag_pipeline:
+        _debug_log("main.py:chat:503", "RAG pipeline not ready", {}, "C")
         raise HTTPException(status_code=503, detail="RAG Pipeline not initialized")
     
     question = request.question.strip()
@@ -102,13 +142,22 @@ def chat_endpoint(request: ChatRequest):
     def sse_generator():
         try:
             for event in rag_pipeline.run_query_stream(question):
+                if event.get("type") == "error":
+                    _debug_log("main.py:chat:sse_error", "Gemini/stream error in SSE", {
+                        "content_preview": str(event.get("content", ""))[:200],
+                    }, "B")
                 yield f"data: {json.dumps(event)}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error(f"Error in streaming query: {str(e)}")
+            _debug_log("main.py:chat:exception", "Streaming exception", {"error": str(e)}, "B")
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 
-    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        sse_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 @app.post("/api/admin/login")
 def admin_login(request: LoginRequest):

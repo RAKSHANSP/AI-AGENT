@@ -115,9 +115,8 @@ class GeminiRAGPipeline:
             "- Tell me about the StartupTN Coimbatore Regional Hub."
         )
         
-        # Initialize Gemini model
-        # Use gemini-3.5-flash as the standard model in this environment
-        self.model = genai.GenerativeModel("gemini-3.5-flash")
+        # gemini-3.5-flash-lite has separate quota from gemini-3.5-flash (20/day free tier)
+        self.model = genai.GenerativeModel("gemini-3.5-flash-lite")
         
         # Build LangChain RAG pipeline
         self._build_chain()

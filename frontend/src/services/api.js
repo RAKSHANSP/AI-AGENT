@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-// Get API base URL from environment variables, fallback to localhost:8000
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Strip trailing slashes so fetch URL concatenation never produces //api/... (404 on Render)
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+
+// #region agent log
+fetch('http://127.0.0.1:7757/ingest/786a4eab-ba0a-4f70-a72c-3b0149ea10a9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0faf1f'},body:JSON.stringify({sessionId:'0faf1f',location:'api.js:init',message:'API base URL resolved',data:{rawEnv:import.meta.env.VITE_API_BASE_URL||null,normalized:API_BASE_URL,chatUrl:`${API_BASE_URL}/api/chat`},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+// #endregion
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -37,14 +41,23 @@ export const apiService = {
 
   // Public Chat Endpoint (Streaming)
   chatStream: async (question, onChunk, onError, onDone) => {
+    const chatUrl = `${API_BASE_URL}/api/chat`;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+      // #region agent log
+      fetch('http://127.0.0.1:7757/ingest/786a4eab-ba0a-4f70-a72c-3b0149ea10a9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0faf1f'},body:JSON.stringify({sessionId:'0faf1f',location:'api.js:chatStream:pre-fetch',message:'Starting chat fetch',data:{chatUrl,questionLen:question?.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+
+      const response = await fetch(chatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ question }),
       });
+
+      // #region agent log
+      fetch('http://127.0.0.1:7757/ingest/786a4eab-ba0a-4f70-a72c-3b0149ea10a9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0faf1f'},body:JSON.stringify({sessionId:'0faf1f',location:'api.js:chatStream:post-fetch',message:'Chat fetch response',data:{chatUrl,status:response.status,ok:response.ok,contentType:response.headers.get('content-type')},timestamp:Date.now(),hypothesisId:'A,C'})}).catch(()=>{});
+      // #endregion
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -84,6 +97,9 @@ export const apiService = {
       }
       onDone();
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7757/ingest/786a4eab-ba0a-4f70-a72c-3b0149ea10a9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0faf1f'},body:JSON.stringify({sessionId:'0faf1f',location:'api.js:chatStream:error',message:'Chat fetch failed',data:{chatUrl,errorMessage:error?.message||String(error)},timestamp:Date.now(),hypothesisId:'A,C,D'})}).catch(()=>{});
+      // #endregion
       onError(error);
     }
   },
