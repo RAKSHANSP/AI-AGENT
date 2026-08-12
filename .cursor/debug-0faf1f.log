@@ -1,15 +1,19 @@
-{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786509052093, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786509052184, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786509052188, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786509057948, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786509058011, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786509058014, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:chat:request", "message": "Chat request received", "data": {"rag_ready": true, "question_len": 50}, "timestamp": 1786509064203, "hypothesisId": "B,C"}
-{"sessionId":"0faf1f","location":"api.js:init","message":"API base URL resolved","data":{"rawEnv":"http://localhost:8000","normalized":"http://localhost:8000","chatUrl":"http://localhost:8000/api/chat"},"timestamp":1786509140160,"hypothesisId":"A"}
-{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786509172211, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786509172311, "hypothesisId": "C"}
-{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786509172317, "hypothesisId": "C"}
-{"sessionId":"0faf1f","location":"api.js:init","message":"API base URL resolved","data":{"rawEnv":"http://localhost:8000","normalized":"http://localhost:8000","chatUrl":"http://localhost:8000/api/chat"},"timestamp":1786509177812,"hypothesisId":"A"}
-{"sessionId":"0faf1f","location":"api.js:chatStream:pre-fetch","message":"Starting chat fetch","data":{"chatUrl":"http://localhost:8000/api/chat","questionLen":50},"timestamp":1786509180813,"hypothesisId":"A"}
-{"sessionId": "0faf1f", "location": "main.py:chat:request", "message": "Chat request received", "data": {"rag_ready": true, "question_len": 50}, "timestamp": 1786509180827, "hypothesisId": "B,C"}
-{"sessionId":"0faf1f","location":"api.js:chatStream:post-fetch","message":"Chat fetch response","data":{"chatUrl":"http://localhost:8000/api/chat","status":200,"ok":true,"contentType":"text/event-stream; charset=utf-8"},"timestamp":1786509180842,"hypothesisId":"A,C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786510040042, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786510040107, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786510040110, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786510051804, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786510051875, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786510051879, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786510061123, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786510061170, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786510061171, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786510065036, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786510065107, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786510065112, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:chat:request", "message": "Chat request received", "data": {"rag_ready": true, "question_len": 2}, "timestamp": 1786510070652, "hypothesisId": "B,C"}
+{"sessionId": "0faf1f", "location": "main.py:chat:request", "message": "Chat request received", "data": {"rag_ready": true, "question_len": 8}, "timestamp": 1786510072082, "hypothesisId": "B,C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:begin", "message": "Startup began", "data": {"data_dir": "/home/rakshan/Desktop/StartupTN-Chatbot/backend/data"}, "timestamp": 1786510095649, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:ready", "message": "RAG pipeline ready before sync", "data": {"chunk_count": 91}, "timestamp": 1786510095700, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:startup:sync_skipped", "message": "Skipped sync; index already populated", "data": {"chunk_count": 91}, "timestamp": 1786510095703, "hypothesisId": "C"}
+{"sessionId": "0faf1f", "location": "main.py:chat:request", "message": "Chat request received", "data": {"rag_ready": true, "question_len": 2}, "timestamp": 1786510100635, "hypothesisId": "B,C"}
+{"sessionId": "0faf1f", "location": "main.py:chat:request", "message": "Chat request received", "data": {"rag_ready": true, "question_len": 8}, "timestamp": 1786510100656, "hypothesisId": "B,C"}

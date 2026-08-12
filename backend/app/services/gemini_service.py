@@ -1,6 +1,7 @@
 import os
+import re
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from dotenv import load_dotenv
 import google.generativeai as genai
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
@@ -100,6 +101,41 @@ WRITING STYLE
 
 Answer:"""
 
+GREETING_PATTERN = re.compile(
+    r"^(hi|hello|hey|hii+|helo|howdy|good\s+(morning|afternoon|evening))(\s+\w+){0,2}[!.?]*$",
+    re.IGNORECASE,
+)
+THANKS_PATTERN = re.compile(
+    r"^(thanks?|thank\s*(you|u|yu)|thx|ty)(\s+(you|so\s+much|a\s+lot))?[!.?]*$",
+    re.IGNORECASE,
+)
+
+CONVERSATIONAL_RESPONSES = {
+    "greeting": (
+        "Hello! I'm the StartupTN AI Assistant. I can help you with government startup schemes, "
+        "DPIIT benefits, MSME support, and StartupTN initiatives. What would you like to know?"
+    ),
+    "thanks": (
+        "You're welcome! Feel free to ask if you have more questions about StartupTN schemes, "
+        "DPIIT registration, or MSME benefits."
+    ),
+}
+
+
+def get_conversational_response(question: str) -> Optional[str]:
+    """Return a friendly reply for short greetings/thanks; skip RAG for these."""
+    text = question.strip()
+    if not text or len(text) > 80:
+        return None
+
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if GREETING_PATTERN.match(normalized):
+        return CONVERSATIONAL_RESPONSES["greeting"]
+    if THANKS_PATTERN.match(normalized):
+        return CONVERSATIONAL_RESPONSES["thanks"]
+    return None
+
+
 class GeminiRAGPipeline:
     """
     Builds and manages a Retrieval-Augmented Generation (RAG) pipeline using LangChain
@@ -196,6 +232,12 @@ class GeminiRAGPipeline:
         Yields:
             dict: Event with type 'sources', 'content', or 'error'
         """
+        conversational = get_conversational_response(question)
+        if conversational:
+            logger.info(f"Conversational reply for: {question!r}")
+            yield {"type": "content", "content": conversational}
+            return
+
         if not api_key:
             yield {"type": "error", "content": "Error: Gemini API key is missing or not configured. Please check your .env file."}
             return
@@ -256,6 +298,10 @@ class GeminiRAGPipeline:
         Returns:
             Tuple[str, List[str]]: (Generated Answer, List of unique source document names)
         """
+        conversational = get_conversational_response(question)
+        if conversational:
+            return conversational, []
+
         if not api_key:
             return "Error: Gemini API key is missing or not configured. Please check your .env file.", []
             
