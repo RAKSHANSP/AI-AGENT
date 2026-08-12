@@ -1,5 +1,7 @@
 import os
 import logging
+from typing import List, Optional
+
 from pypdf import PdfReader
 from langchain_core.documents import Document
 
@@ -54,4 +56,36 @@ def load_pdfs_from_directory(directory_path: str) -> list[Document]:
             logger.error(f"Failed to parse {filename}: {str(e)}")
             
     logger.info(f"Extracted a total of {len(documents)} pages from PDFs.")
+    return documents
+
+
+def load_single_pdf(file_path: str, filename: Optional[str] = None) -> List[Document]:
+    """Load one PDF file only — avoids reloading the entire data folder during sync."""
+    documents = []
+    filename = filename or os.path.basename(file_path)
+
+    if not os.path.exists(file_path):
+        logger.error(f"File '{file_path}' does not exist.")
+        return documents
+
+    logger.info(f"Processing PDF file: {filename}")
+    try:
+        reader = PdfReader(file_path)
+        num_pages = len(reader.pages)
+        for page_num in range(num_pages):
+            page = reader.pages[page_num]
+            text = (page.extract_text() or "").strip()
+            if text:
+                documents.append(Document(
+                    page_content=text,
+                    metadata={
+                        "source": filename,
+                        "page": page_num + 1,
+                        "file_path": file_path,
+                    },
+                ))
+        logger.info(f"Successfully processed {filename} ({num_pages} pages, {len(documents)} with text).")
+    except Exception as e:
+        logger.error(f"Failed to parse {filename}: {str(e)}")
+
     return documents

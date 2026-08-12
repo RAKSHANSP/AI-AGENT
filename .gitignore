@@ -19,8 +19,8 @@ backend/app/**/__pycache__/
 venv/
 .venv/
 
-# Local databases & user data
-backend/chroma_db/
+# Local databases — chroma_db is committed pre-built for Render (512MB limit)
+# backend/chroma_db/
 
 # IDE & OS files
 .idea/

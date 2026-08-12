@@ -104,6 +104,13 @@ async def startup_event():
 
         async def background_sync():
             try:
+                if vector_store.get_document_count() > 0:
+                    logger.info("Pre-built index detected — skipping startup sync.")
+                    _debug_log("main.py:startup:sync_skipped", "Skipped startup sync", {
+                        "chunk_count": vector_store.get_document_count(),
+                    }, "A")
+                    return
+                logger.info("Empty index — syncing PDFs from data folder...")
                 stats = vector_store.sync_database(data_dir=DATA_DIR)
                 _debug_log("main.py:startup:sync_done", "Background sync complete", {
                     "indexed": stats.get("indexed", []),

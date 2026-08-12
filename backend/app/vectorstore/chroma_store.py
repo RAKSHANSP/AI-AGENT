@@ -2,8 +2,11 @@ import os
 import uuid
 import json
 import time
+import gc
 import logging
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
+
+EMBED_BATCH_SIZE = 8
 
 DEBUG_LOG_PATH = "/home/rakshan/Desktop/StartupTN-Chatbot/.cursor/debug-0faf1f.log"
 
@@ -41,7 +44,7 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
 
-from app.utils.pdf_loader import load_pdfs_from_directory
+from app.utils.pdf_loader import load_single_pdf
 from app.utils.text_splitter import split_documents
 
 logger = logging.getLogger(__name__)
@@ -49,21 +52,24 @@ logger = logging.getLogger(__name__)
 class LocalEmbeddingWrapper:
     """
     Local embeddings via FastEmbed — no Gemini API quota needed for indexing.
+    Loaded lazily on first use to keep Render startup under 512MB.
     """
     _model = None
 
-    def __init__(self):
+    def _ensure_model(self):
         if LocalEmbeddingWrapper._model is None:
             from fastembed import TextEmbedding
             logger.info("Loading local FastEmbed model (BAAI/bge-small-en-v1.5)")
             LocalEmbeddingWrapper._model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-        self.model = LocalEmbeddingWrapper._model
+        return LocalEmbeddingWrapper._model
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return [[float(x) for x in vec] for vec in self.model.embed(texts)]
+        model = self._ensure_model()
+        return [[float(x) for x in vec] for vec in model.embed(texts)]
 
     def embed_query(self, text: str) -> List[float]:
-        return [float(x) for x in next(self.model.embed([text]))]
+        model = self._ensure_model()
+        return [float(x) for x in next(model.embed([text]))]
 
 
 class ChromaLangChainRetriever(BaseRetriever):
@@ -111,16 +117,40 @@ class StartupTNVectorStore:
             os.makedirs(self.db_path, exist_ok=True)
             _CLIENTS[self.db_path] = chromadb.PersistentClient(path=self.db_path)
         self.client = _CLIENTS[self.db_path]
-        
-        # Initialize local embeddings (no API quota)
-        self.embedder = LocalEmbeddingWrapper()
-        
+
+        # Lazy — model loads on first embed (saves ~200MB during Render boot)
+        self._embedder: Optional[LocalEmbeddingWrapper] = None
+
         # Get or create persistent collection
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
             metadata={"hnsw:space": "cosine"}
         )
         logger.info(f"Initialized ChromaDB at {self.db_path} with collection: {collection_name}")
+
+    @property
+    def embedder(self) -> LocalEmbeddingWrapper:
+        if self._embedder is None:
+            self._embedder = LocalEmbeddingWrapper()
+        return self._embedder
+
+    def _index_file_in_batches(self, filename: str, chunks: List[Document]) -> int:
+        """Embed and store chunks in small batches to stay within Render 512MB limit."""
+        added = 0
+        for i in range(0, len(chunks), EMBED_BATCH_SIZE):
+            batch = chunks[i:i + EMBED_BATCH_SIZE]
+            texts = [c.page_content for c in batch]
+            metadatas = [c.metadata for c in batch]
+            embeddings = self.embedder.embed_documents(texts)
+            ids = [f"{filename}_{uuid.uuid4()}" for _ in batch]
+            self.collection.add(
+                ids=ids,
+                embeddings=embeddings,
+                metadatas=metadatas,
+                documents=texts,
+            )
+            added += len(batch)
+        return added
 
     def get_indexed_files(self) -> List[str]:
         """
@@ -197,36 +227,21 @@ class StartupTNVectorStore:
             for filename in to_index:
                 file_path = os.path.join(data_dir, filename)
                 try:
-                    # 1. Load single document
-                    docs = load_pdfs_from_directory(data_dir)
-                    # Filter documents to only include the current file
-                    file_docs = [d for d in docs if d.metadata.get("source") == filename]
-                    
+                    file_docs = load_single_pdf(file_path, filename)
+
                     if not file_docs:
                         logger.warning(f"No text extracted from {filename}")
                         continue
-                        
-                    # 2. Split single document
+
                     chunks = split_documents(file_docs)
                     if not chunks:
                         continue
-                        
-                    # 3. Add to Chroma
-                    texts = [c.page_content for c in chunks]
-                    metadatas = [c.metadata for c in chunks]
-                    embeddings = self.embedder.embed_documents(texts)
-                    ids = [f"{filename}_{uuid.uuid4()}" for _ in chunks]
-                    
-                    self.collection.add(
-                        ids=ids,
-                        embeddings=embeddings,
-                        metadatas=metadatas,
-                        documents=texts
-                    )
-                    
+
+                    added = self._index_file_in_batches(filename, chunks)
                     stats["indexed"].append(filename)
-                    stats["total_chunks_added"] += len(chunks)
-                    logger.info(f"Successfully indexed {filename} ({len(chunks)} chunks).")
+                    stats["total_chunks_added"] += added
+                    logger.info(f"Successfully indexed {filename} ({added} chunks).")
+                    gc.collect()
                 except Exception as e:
                     err_msg = str(e)
                     logger.error(f"Failed to index {filename}: {err_msg}")
