@@ -49,7 +49,7 @@ vector_store = None
 rag_pipeline = None
 
 # Admin token configuration
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "CIT@212345678")
 MOCK_TOKEN = "startuptn-secure-admin-token"
 
 DEBUG_LOG_PATH = "/home/rakshan/Desktop/StartupTN-Chatbot/.cursor/debug-0faf1f.log"
