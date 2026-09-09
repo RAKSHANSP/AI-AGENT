@@ -63,41 +63,41 @@ Then suggest 2-3 related questions about StartupTN schemes or DPIIT benefits if 
 6. Write as if you are an official StartupTN support assistant.
 
 =========================
-RESPONSE STYLE
+RESPONSE STYLE & EXPLANATIONS
 =========================
-Structure your response exactly as follows whenever applicable (do not include headers that are not applicable to the question):
+1. Explain in simple, beginner-friendly English that any startup founder can easily understand. Avoid dense legal or bureaucratic jargon.
+2. Whenever the user requests examples, or if an example helps clarify a scheme/process, include a dedicated "Practical Example" section with clear, real-world illustrations based on the context.
+
+Structure your response using applicable sections:
 
 # Short Answer
-A 2-3 sentence summary that directly answers the user's question.
+A 2-3 sentence summary that directly answers the user's question in plain English.
 
 # Detailed Explanation
-Explain the topic in simple English. Avoid copying sentences directly from the context. Rewrite naturally, as if explaining to a startup founder.
+Explain the topic in simple terms. Avoid copying sentences directly from the context; rewrite naturally.
+
+# Practical Example
+If requested or helpful, provide a clear, real-world example explaining how this scheme/process works for a startup.
 
 # Benefits
-Use bullet points if applicable.
+Use clear bullet points.
 
 # Eligibility
-Explain who can apply if applicable.
+Explain who can apply in simple terms.
 
 # Process / Steps
-Write numbered steps if applicable.
+Write clear numbered steps.
 
 # Important Notes
-Mention any conditions, limitations, or exceptions.
-
-# Related StartupTN Schemes
-If relevant, recommend other schemes.
+Mention key conditions or deadlines.
 
 =========================
 WRITING STYLE
 =========================
-- Use professional, warm English.
+- Use simple, warm, professional English.
 - Avoid robotic wording.
-- Avoid repeating information.
-- Use headings, bullet points, and numbered lists.
-- Explain abbreviations when first introduced.
-- Keep paragraphs short.
-- Never dump raw text. Rewrite everything naturally.
+- Use clear headings, bullet points, and numbered lists.
+- Keep sentences and paragraphs short and readable.
 
 Answer:"""
 
@@ -151,8 +151,10 @@ class GeminiRAGPipeline:
             "- Tell me about the StartupTN Coimbatore Regional Hub."
         )
         
-        # gemini-3.5-flash-lite has separate quota from gemini-3.5-flash (20/day free tier)
-        self.model = genai.GenerativeModel("gemini-3.5-flash-lite")
+        model_name = os.getenv("GEMINI_MODEL", "models/gemini-3.5-flash-lite")
+        if not model_name.startswith("models/"):
+            model_name = f"models/{model_name}"
+        self.model = genai.GenerativeModel(model_name)
         
         # Build LangChain RAG pipeline
         self._build_chain()
@@ -238,9 +240,11 @@ class GeminiRAGPipeline:
             yield {"type": "content", "content": conversational}
             return
 
-        if not api_key:
+        current_key = os.getenv("GEMINI_API_KEY", api_key)
+        if not current_key:
             yield {"type": "error", "content": "Error: Gemini API key is missing or not configured. Please check your .env file."}
             return
+        genai.configure(api_key=current_key)
             
         try:
             logger.info(f"Running streaming query: {question}")

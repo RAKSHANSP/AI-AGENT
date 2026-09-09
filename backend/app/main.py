@@ -97,6 +97,8 @@ async def startup_event():
     _debug_log("main.py:startup:begin", "Startup began", {"data_dir": DATA_DIR}, "C")
     try:
         vector_store = StartupTNVectorStore(db_path=DB_PATH)
+        logger.info("Pre-warming local FastEmbed embedding model...")
+        _ = vector_store.embedder._ensure_model()
         rag_pipeline = GeminiRAGPipeline(vector_store.get_retriever())
         _debug_log("main.py:startup:ready", "RAG pipeline ready before sync", {
             "chunk_count": vector_store.get_document_count(),
